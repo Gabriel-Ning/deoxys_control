@@ -13,6 +13,10 @@ mkdir -p build
 cd build
 mamba run -n franka_teach cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_DEOXYS=1
 mamba run -n franka_teach make -j
+# Copy proto interface files to $PROJ_DIR/proto
+mkdir -p "$PROJ_DIR/proto"
+cp -r "$PROJ_DIR/build/proto/python/"* "$PROJ_DIR/proto/"
+rm -rf "$PROJ_DIR/build"
 
 cd "$PROJ_DIR"
 mamba run -n franka_teach pip install -U -r requirements.txt
