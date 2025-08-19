@@ -58,8 +58,8 @@ bool JointImpedanceController::ParseMessage(const FrankaControlMessage &msg) {
   Kp << Eigen::Map<const Eigen::Matrix<double, 7, 1>>(kp_array.data());
   Kd << Eigen::Map<const Eigen::Matrix<double, 7, 1>>(kd_array.data());
 
-  joint_max_ << 2.8978, 1.7628, 2.8973, -0.0698, 2.8973, 3.7525, 2.8973;
-  joint_min_ << -2.8973, -1.7628, -2.8973, -3.0718, -2.8973, -0.0175, -2.8973;
+  joint_max_ << 2.7437, 1.7837, 2.9007, -0.1518, 2.8065, 4.5169, 3.0159;
+  joint_min_ << -2.7437, -1.7837, -2.9007, -3.0421, -2.8065, 0.5445, -3.0159;
 
   this->state_estimator_ptr_->ParseMessage(msg.state_estimator_msg());
   return true;

@@ -10,17 +10,16 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from deoxys import config_root
-from deoxys.camera_redis_interface import CameraRedisSubInterface
+from deoxys_vision.networking.camera_redis_interface import CameraRedisSubInterface
 from deoxys.franka_interface import FrankaInterface
-from deoxys.k4a_interface import K4aInterface
 from deoxys.utils import YamlConfig
 from deoxys.utils.input_utils import input2action
 from deoxys.utils.io_devices import SpaceMouse
-
+from deoxys.experimental.motion_utils import reset_joints_to
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--interface-cfg", type=str, default="alice.yml")
+    parser.add_argument("--interface-cfg", type=str, default="franka_right.yml")
     parser.add_argument(
         "--controller-cfg", type=str, default="osc-position-controller.yml"
     )
@@ -28,7 +27,6 @@ def parse_args():
 
     args = parser.parse_args()
     return args
-
 
 def main():
     args = parse_args()
@@ -43,9 +41,6 @@ def main():
     #     cr_interface.start()
     #     cr_interfaces[camera_id] = cr_interface
 
-    # Initialize robot interface
-    controller_cfg = YamlConfig(config_root + f"/{args.controller_cfg}").as_easydict()
-    controller_type = "OSC_POSITION"
 
     robot_interface = FrankaInterface(config_root + f"/{args.interface_cfg}")
 
@@ -53,6 +48,19 @@ def main():
     demo = h5py.File(demo_file_name, "r")
 
     episode = demo["data/ep_0"]
+
+    joint_sequence = episode["proprio_joints"]
+    joint_start = joint_sequence[0]
+    print("move to starting point of the trajectory ...")
+    print(joint_start)
+    reset_joints_to(robot_interface, joint_start)
+    time.sleep(3)
+    print("replay trajectory ...")
+    
+
+    # Initialize robot interface
+    controller_cfg = YamlConfig(config_root + f"/{args.controller_cfg}").as_easydict()
+    controller_type = "OSC_POSE"
 
     actions = episode["actions"][()]
 

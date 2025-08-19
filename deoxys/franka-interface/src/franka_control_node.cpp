@@ -332,8 +332,8 @@ int main(int argc, char **argv) {
           global_handler->logger->debug("Counter {0}",
                                         global_handler->no_msg_counter);
           if (global_handler->no_msg_counter >= 20) {
-            global_handler->running = false;
-            global_handler->termination = true;
+            // global_handler->running = false;
+            // global_handler->termination = true;
             global_handler->logger->debug(
                 "No valid messages received in 20 steps");
           }
@@ -570,9 +570,11 @@ int main(int argc, char **argv) {
         } else if (controller_type == ControllerType::JOINT_POSITION) {
           // Joint Position control callback
           global_handler->logger->info("Joint position callback");
+          global_handler->logger->info("Hello hello");
           robot.control(control_callbacks::CreateJointPositionCallback(
               global_handler, state_publisher, model, current_state_info,
               goal_state_info, policy_rate, traj_rate));
+	  global_handler->logger->info("Joint position callback complete");
         } else if (controller_type == ControllerType::CARTESIAN_VELOCITY) {
           // Cartesian Velocity control callback
           global_handler->logger->info("Cartesian velocity callback");

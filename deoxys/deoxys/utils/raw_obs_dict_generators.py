@@ -1,7 +1,7 @@
 """A compliation of multiple state observation generator."""
 
 import numpy as np
-import rpl_vision_utils.utils.img_utils as ImgUtils
+import deoxys_vision.utils.img_utils as ImgUtils
 
 
 class BaseRawObsDictGenerator:

@@ -6,7 +6,7 @@ project (deoxys
   LANGUAGES CXX
   )
 
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -27,7 +27,6 @@ message("${_GLIBCXX_USE_CXX11_ABI}")
 find_package(Protobuf REQUIRED)
 
 include(${CMAKE_CURRENT_LIST_DIR}/cmake/protobuf.cmake)
-include(${CMAKE_CURRENT_LIST_DIR}/libfranka/cmake/FindEigen3.cmake)
 
 # cmake-format: off
 #  ____            _        _            __
@@ -64,17 +63,17 @@ if (BUILD_FRANKA)
   set(THREADS_PREFER_PTHREAD_FLAG ON)
   find_package(Threads REQUIRED)
 
-  add_subdirectory(libfranka)
-  add_subdirectory(zmqpp)
-  add_subdirectory(spdlog)
+  find_package(Franka REQUIRED)
+  add_subdirectory(extern/zmqpp)
+  add_subdirectory(extern/spdlog)
 
   set(YAML_BUILD_SHARED_LIBS ON CACHE BOOL "BUild shared library of yaml-cpp")
   set(YAML_CPP_BUILD_TESTS OFF CACHE BOOL "")
-  add_subdirectory(yaml-cpp)
-  include_directories(zmqpp/src)
+  add_subdirectory(extern/yaml-cpp)
+  include_directories(extern/zmqpp/src)
   include_directories(franka-interface/include)
 
-  set(FRANKA_LIBS Eigen3::Eigen3 Franka::Franka Threads::Threads zmqpp yaml-cpp spdlog)
+  set(FRANKA_LIBS Eigen3::Eigen Franka::Franka Threads::Threads zmqpp yaml-cpp spdlog)
 
   # Add your new controller files here
   set (CONTROLLERS

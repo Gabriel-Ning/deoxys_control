@@ -16,7 +16,8 @@ logger = logging.getLogger(__name__)
 
 
 def add_robot_config_arguments(parser):
-    parser.add_argument("--interface-cfg", type=str, default="charmander.yml")
+    # parser.add_argument("--interface-cfg", type=str, default="charmander.yml")
+    parser.add_argument("--interface-cfg", type=str, default="franka_right.yml")
     parser.add_argument("--folder", type=Path, default="/tmp/deoxys_demo_data")
 
 

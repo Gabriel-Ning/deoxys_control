@@ -28,6 +28,7 @@ def action_to_osc_pose_goal(action, is_delta=True) -> franka_controller_pb2.Goal
     goal.az = action[5]
     return goal
 
+
 def action_to_cartesian_velocity(action, is_delta=True) -> franka_controller_pb2.Goal:
     goal = franka_controller_pb2.Goal()
     goal.is_delta = is_delta
@@ -38,6 +39,7 @@ def action_to_cartesian_velocity(action, is_delta=True) -> franka_controller_pb2
     goal.ay = action[4]
     goal.az = action[5]
     return goal
+
 
 def action_to_joint_pos_goal(action, is_delta=False) -> franka_controller_pb2.JointGoal:
     goal = franka_controller_pb2.JointGoal()
@@ -60,7 +62,7 @@ TRAJ_INTERPOLATOR_MAPPING = {
     "MIN_JERK_POSE": franka_controller_pb2.FrankaControlMessage.TrajInterpolatorType.MIN_JERK_POSE,
     "MIN_JERK_JOINT_POSITION": franka_controller_pb2.FrankaControlMessage.TrajInterpolatorType.MIN_JERK_JOINT_POSITION,
     "COSINE_CARTESIAN_VELOCITY": franka_controller_pb2.FrankaControlMessage.TrajInterpolatorType.COSINE_CARTESIAN_VELOCITY,
-    "LINEAR_CARTESIAN_VELOCITY": franka_controller_pb2.FrankaControlMessage.TrajInterpolatorType.LINEAR_CARTESIAN_VELOCITY
+    "LINEAR_CARTESIAN_VELOCITY": franka_controller_pb2.FrankaControlMessage.TrajInterpolatorType.LINEAR_CARTESIAN_VELOCITY,
 }
 
 
@@ -84,7 +86,7 @@ class FrankaInterface:
         control_timeout: float = 1.0,
         has_gripper: bool = True,
         use_visualizer: bool = False,
-        automatic_gripper_reset: bool=True,
+        automatic_gripper_reset: bool = True,
     ):
         general_cfg = YamlConfig(general_cfg_file).as_easydict()
         self._name = general_cfg.PC.NAME
@@ -193,7 +195,6 @@ class FrankaInterface:
                 pass
 
     def preprocess(self):
-
         if self.automatic_gripper_reset:
             gripper_control_msg = franka_controller_pb2.FrankaGripperControlMessage()
             move_msg = franka_controller_pb2.FrankaGripperMoveMessage()
@@ -259,9 +260,7 @@ class FrankaInterface:
         state_estimator_msg.is_estimation = (
             controller_cfg.state_estimator_cfg.is_estimation
         )
-        state_estimator_msg.estimator_type = (
-            franka_controller_pb2.FrankaStateEstimatorMessage.EstimatorType.EXPONENTIAL_SMOOTHING_ESTIMATOR
-        )
+        state_estimator_msg.estimator_type = franka_controller_pb2.FrankaStateEstimatorMessage.EstimatorType.EXPONENTIAL_SMOOTHING_ESTIMATOR
         exponential_estimator = franka_controller_pb2.ExponentialSmoothingConfig()
         exponential_estimator.alpha_q = controller_cfg.state_estimator_cfg.alpha_q
         exponential_estimator.alpha_dq = controller_cfg.state_estimator_cfg.alpha_dq
@@ -308,7 +307,6 @@ class FrankaInterface:
             self._publisher.send(msg_str)
 
         elif controller_type == "OSC_POSITION":
-
             assert controller_cfg is not None
 
             osc_msg = franka_controller_pb2.FrankaOSCPoseControllerMessage()
@@ -383,7 +381,6 @@ class FrankaInterface:
             self._publisher.send(msg_str)
 
         elif controller_type == "JOINT_POSITION":
-
             assert controller_cfg is not None
             assert len(action) == 7 + 1
 
@@ -397,9 +394,7 @@ class FrankaInterface:
             control_msg.controller_type = (
                 franka_controller_pb2.FrankaControlMessage.ControllerType.JOINT_POSITION
             )
-            control_msg.traj_interpolator_type = (
-                franka_controller_pb2.FrankaControlMessage.TrajInterpolatorType.SMOOTH_JOINT_POSITION
-            )
+            control_msg.traj_interpolator_type = franka_controller_pb2.FrankaControlMessage.TrajInterpolatorType.SMOOTH_JOINT_POSITION
             control_msg.traj_interpolator_time_fraction = (
                 controller_cfg.traj_interpolator_cfg["time_fraction"]
             )
@@ -413,7 +408,6 @@ class FrankaInterface:
             self._publisher.send(msg_str)
 
         elif controller_type == "JOINT_IMPEDANCE":
-
             assert controller_cfg is not None
             assert len(action) == 7 + 1
 
@@ -428,9 +422,7 @@ class FrankaInterface:
             joint_impedance_msg.kd[:] = controller_cfg.joint_kd
 
             control_msg = franka_controller_pb2.FrankaControlMessage()
-            control_msg.controller_type = (
-                franka_controller_pb2.FrankaControlMessage.ControllerType.JOINT_IMPEDANCE
-            )
+            control_msg.controller_type = franka_controller_pb2.FrankaControlMessage.ControllerType.JOINT_IMPEDANCE
             control_msg.traj_interpolator_type = TRAJ_INTERPOLATOR_MAPPING[
                 controller_cfg.traj_interpolator_cfg.traj_interpolator_type
             ]
@@ -449,7 +441,9 @@ class FrankaInterface:
         elif controller_type == "CARTESIAN_VELOCITY":
             assert controller_cfg is not None
 
-            cartesian_velocity_msg = franka_controller_pb2.FrankaCartesianVelocityControllerMessage()
+            cartesian_velocity_msg = (
+                franka_controller_pb2.FrankaCartesianVelocityControllerMessage()
+            )
 
             action[0:3] *= controller_cfg.action_scale.translation
             action[3 : self.last_gripper_dim] *= controller_cfg.action_scale.rotation
@@ -457,13 +451,13 @@ class FrankaInterface:
             logger.debug(f"OSC action: {np.round(action, 3)}")
 
             self._history_actions.append(action)
-            goal = action_to_cartesian_velocity(action, is_delta=controller_cfg.is_delta)
+            goal = action_to_cartesian_velocity(
+                action, is_delta=controller_cfg.is_delta
+            )
             cartesian_velocity_msg.goal.CopyFrom(goal)
 
             control_msg = franka_controller_pb2.FrankaControlMessage()
-            control_msg.controller_type = (
-                franka_controller_pb2.FrankaControlMessage.ControllerType.CARTESIAN_VELOCITY
-            )
+            control_msg.controller_type = franka_controller_pb2.FrankaControlMessage.ControllerType.CARTESIAN_VELOCITY
             control_msg.traj_interpolator_type = TRAJ_INTERPOLATOR_MAPPING[
                 controller_cfg.traj_interpolator_cfg.traj_interpolator_type
             ]

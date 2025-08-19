@@ -28,7 +28,6 @@ def parse_args():
     args = parser.parse_args()
     return args
 
-
 def main():
     args = parse_args()
     camera_ids = [0, 1]

@@ -237,7 +237,7 @@ std::array<double, 7> OSCPositionImpedanceController::Step(
   // tau_d << tau_d + coriolis;
   // tau_d << tau_d + gravity;
   // nullspace control
-  tau_d << tau_d + Nullspace * (static_q_task_ - current_q);
+  // tau_d << tau_d + Nullspace * (static_q_task_ - current_q);
   // std::cout << "Nullspace : " << (Nullspace * (static_q_task_ -
   // q)).transpose() << std::endl;
   std::array<double, 7> tau_d_array{};

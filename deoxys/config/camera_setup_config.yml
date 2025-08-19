@@ -1,0 +1,15 @@
+cameras:
+  - camera_info:
+      type: rs
+      id: "218622277360"
+      name: wrist_front
+
+  # - camera_info:
+  #     type: rs
+  #     id: "243222073456"
+  #     name: wrist_back
+
+  - camera_info:
+      type: rs
+      id: "243222071293"
+      name: tripod_fixed

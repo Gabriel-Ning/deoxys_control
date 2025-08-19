@@ -1,36 +1,28 @@
 import argparse
 import time
-
+from deoxys import config_root
 from deoxys.franka_interface import FrankaInterface
 from deoxys.utils.config_utils import get_default_controller_config
 from deoxys.utils.input_utils import input2action
-from deoxys.utils.io_devices import SpaceMouse
 from deoxys.utils.io_devices import ZikwayGamepad
 from deoxys.utils.log_utils import get_deoxys_example_logger
 
 logger = get_deoxys_example_logger()
 
-
 def main():
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--interface-cfg", type=str, default="/home/gn/Documents/Reaserach_Space/nyu_learning/deoxys_control/deoxys/config/franka_right.yml")
+    parser.add_argument("--interface-cfg", type=str, default="franka_right.yml")
     parser.add_argument("--controller-type", type=str, default="OSC_POSE")
 
-    # parser.add_argument("--vendor-id", type=int, default=9583)
-    # parser.add_argument("--product-id", type=int, default=50734)
-
     args = parser.parse_args()
-
-    # device = SpaceMouse(vendor_id=args.vendor_id, product_id=args.product_id)
-    device = ZikwayGamepad(pos_sensitivity= 0.5, rot_sensitivity=0.5)
+    device = ZikwayGamepad(pos_sensitivity= 1.0, rot_sensitivity=1.0)
     device.start_control()
 
-    robot_interface = FrankaInterface(args.interface_cfg, use_visualizer=True)
+    robot_interface = FrankaInterface(config_root + f"/{args.interface_cfg}", use_visualizer=True)
 
     controller_type = args.controller_type
     controller_cfg = get_default_controller_config(controller_type=controller_type)
-    # controller_cfg = YamlConfig("config/osc-pose-controller.yml").as_easydict()
 
     robot_interface._state_buffer = []
 

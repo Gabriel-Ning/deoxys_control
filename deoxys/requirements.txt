@@ -3,11 +3,10 @@ PyYAML
 easydict
 google-api-python-client
 pybullet
-numpy
+numpy<2
 hidapi
 glfw
 numba
 termcolor
 simplejson
-mujoco==3.1.0
-
+mujoco

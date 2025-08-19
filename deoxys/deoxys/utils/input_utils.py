@@ -25,6 +25,7 @@ def input2action(device, controller_type="OSC_POSE", robot_name="Panda", gripper
     action = None
 
     if not reset:
+        ##########3
         if controller_type == "OSC_POSE":
             drotation[2] = -drotation[2]
             drotation *= 75
@@ -33,6 +34,18 @@ def input2action(device, controller_type="OSC_POSE", robot_name="Panda", gripper
 
             grasp = 1 if grasp else -1
             action = np.concatenate([dpos, drotation, [grasp] * gripper_dof])
+###################
+        # if controller_type == "OSC_POSE":
+        #     drotation[2] = -drotation[2]
+        #     drotation[0] = 0
+        #     drotation[1] = 0
+        #     drotation *= 75
+        #     dpos *= 200
+        #     drotation = drotation
+
+        #     grasp = 1 if grasp else -1
+        #     action = np.concatenate([dpos, drotation, [grasp] * gripper_dof])
+
 
         if controller_type == "OSC_YAW":
             drotation[2] = -drotation[2]

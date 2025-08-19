@@ -19,7 +19,9 @@ from deoxys.utils.config_utils import (add_robot_config_arguments,
                                        get_default_controller_config)
 from deoxys.utils.input_utils import input2action
 from deoxys.utils.io_devices import SpaceMouse
+from deoxys.utils.io_devices import ZikwayGamepad
 from deoxys.utils.log_utils import get_deoxys_example_logger
+from deoxys.experimental.motion_utils import reset_joints_to
 
 logger = get_deoxys_example_logger()
 
@@ -34,7 +36,7 @@ def parse_args():
     parser.add_argument(
         "--product_id",
         type=int,
-        default=50734,
+        default=50741,
     )
     parser.add_argument("--controller-type", type=str, default="OSC_POSE")
     parser.add_argument(
@@ -67,9 +69,6 @@ def main():
     experiment_id += 1
     folder = str(args.folder / f"run{experiment_id}")
 
-    device = SpaceMouse(vendor_id=args.vendor_id, product_id=args.product_id)
-    device.start_control()
-
     # Franka Interface
     if args.interface_cfg[0] != "/":
         config_path = os.path.join(config_root, args.interface_cfg)
@@ -89,6 +88,16 @@ def main():
         logger.warn("Config specification mismatched, using default controller config")
         controller_cfg = get_default_controller_config(controller_type)
 
+    joint_start = [0, -np.pi / 4, 0, -3 * np.pi / 4, 0, np.pi / 2, np.pi / 4]
+    print("move to starting point of the trajectory ...")
+    print(joint_start)
+    reset_joints_to(robot_interface, joint_start)
+    time.sleep(3)
+    print("replay trajectory ...")
+
+    device = SpaceMouse(vendor_id=args.vendor_id, product_id=args.product_id)
+    device.start_control()
+
     data = {"action": [], "ee_states": [], "joint_states": [], "gripper_states": []}
     i = 0
     start = False
@@ -97,7 +106,7 @@ def main():
 
     time.sleep(2)
 
-    while i < 4000:
+    while i < 2400:
         logger.info(i)
         i += 1
         start_time = time.time_ns()
@@ -177,6 +186,7 @@ def main():
         grp.create_dataset("gripper_states", data=np.array(data["gripper_states"]))
 
     robot_interface.close()
+    device.close() # close the spacemouse thread !!!
     logger.info("Total length of the trajectory: {}".format(len(data["action"])))
     logger.info(f"The trajectory info is saved in {folder}/recorded_trajecotry.hdf5")
     valid_input = False

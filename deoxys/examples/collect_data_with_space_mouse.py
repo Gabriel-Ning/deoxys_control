@@ -10,20 +10,16 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
-from rpl_vision_utils.networking.camera_redis_interface import \
-    CameraRedisSubInterface
-
+from deoxys_vision.networking.camera_redis_interface import CameraRedisSubInterface
 from deoxys import config_root
 from deoxys.franka_interface import FrankaInterface
 from deoxys.utils import YamlConfig
 from deoxys.utils.config_utils import robot_config_parse_args
 from deoxys.utils.input_utils import input2action
-# from deoxys.k4a_interface import K4aInterface
 from deoxys.utils.io_devices import SpaceMouse
 from deoxys.utils.log_utils import get_deoxys_example_logger
 
 logger = get_deoxys_example_logger()
-
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -161,6 +157,7 @@ def main():
 
         end_time = time.time_ns()
         print(f"Time profile: {(end_time - start_time) / 10 ** 9}")
+        
     os.makedirs(folder, exist_ok=True)
     with open(f"{folder}/config.json", "w") as f:
         config_dict = {
@@ -185,6 +182,7 @@ def main():
         )
         cr_interfaces[camera_id].stop()
     robot_interface.close()
+    device.stop_control()
     print("Total length of the trajectory: ", len(data["action"]))
     valid_input = False
     while not valid_input:

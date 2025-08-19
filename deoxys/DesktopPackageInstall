@@ -1,0 +1,19 @@
+# Get current directory path
+PROJ_DIR="$(pwd)"
+echo "Current directory: $PROJ_DIR"
+
+# Create conda environment
+mamba env create -y -n franka_teach python=3.10
+
+# Install packages in the nyu_ws environment
+mamba install -y -n franka_teach zeromq libprotobuf protobuf cmake make pkg-config 
+
+cd "$PROJ_DIR"
+mkdir -p build
+cd build
+mamba run -n franka_teach cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_DEOXYS=1
+mamba run -n franka_teach make -j
+
+cd "$PROJ_DIR"
+mamba run -n franka_teach pip install -U -r requirements.txt
+mamba run -n franka_teach pip install -e .
