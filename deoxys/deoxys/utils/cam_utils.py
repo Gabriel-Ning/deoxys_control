@@ -2,29 +2,78 @@ import os
 import yaml
 from deoxys import config_root
 import cv2
+import time
 
-class RsCameraInfo:
-    def __init__(self, camera_type, camera_id, camera_name):
+CAM_FPS = 30
+DEPTH_PORT_OFFSET = 1000
+
+class CameraInfo:
+    def __init__(self, camera_type, 
+                       camera_id, 
+                       camera_name, 
+                       camera_serial_num, 
+                       camera_config):
         self.camera_type = camera_type
-        self.camera_id = str(camera_id)
+        self.camera_id = camera_id
         self.camera_name = camera_name
+        self.camera_serial_num = camera_serial_num
+        self.cfg = camera_config
 
     def __repr__(self):
-        return f"RsCameraInfo(type={self.camera_type}, id={self.camera_id}, name={self.camera_name})"
+        return (f"RsCameraInfo(type={self.camera_type}, id={self.camera_id}, "
+                f"name={self.camera_name}, serial={self.camera_serial_num}, "
+                f"host={self.cfg['host']}, port={self.cfg['port']}, depth_offset={self.cfg['depth_port_offset']}, "
+                f"width={self.cfg['width']}, height={self.cfg['height']}, fps={self.cfg['fps']})")
 
 def load_camera_config(yaml_path=None):
     if yaml_path is None:
-        yaml_path = os.path.join(config_root, "camera_setup_config.yml")
+       yaml_path = os.path.join(config_root, "camera_setup_config.yml")
     with open(yaml_path, "r") as f:
         config = yaml.safe_load(f)
     camera_infos = []
-    for entry in config["cameras"]:
-        info = entry["camera_info"]
-        cam = RsCameraInfo(
-            camera_type=info["type"],
-            camera_id=info["id"],
-            camera_name=info["name"]
+
+
+    camera_host = config.get("cam_host", "unknown")
+    camera_port = int(config.get("cam_port", 8000))
+    depth_port_offset = int(config.get("depth_port_offset", 0))
+
+    for entry in config.get("cam_info", []):
+        camera_type = entry.get("type", "unknown")
+        camera_id = entry.get("cam_id", 0)
+        camera_name = entry.get("name", "unknown")
+        camera_serial_num = entry.get("cam_serial_num", "unknown")
+
+        camera_config = {}
+        if camera_type == "realsense":
+            camera_config = {
+            "host": camera_host,
+            "port": camera_port,
+            "depth_port_offset": depth_port_offset,
+            "width": config.get("cam_config", {}).get("realsense", {}).get("width", 640),
+            "height": config.get("cam_config", {}).get("realsense", {}).get("height", 480),
+            "fps": config.get("cam_config", {}).get("realsense", {}).get("fps", 30),
+            "processing_preset": config.get("cam_config", {}).get("realsense", {}).get("processing_preset", 1),
+            "depth": config.get("cam_config", {}).get("realsense", {}).get("depth", False)
+            }
+
+        elif camera_type == "fisheye":
+            camera_config = {
+            "host": camera_host,
+            "port": camera_port,
+            "depth_port_offset": depth_port_offset,
+            "width": config.get("cam_config", {}).get("fisheye", {}).get("width", 640),
+            "height": config.get("cam_config", {}).get("fisheye", {}).get("height", 480),
+            "fps": config.get("cam_config", {}).get("fisheye", {}).get("fps", 30)
+            }
+
+        cam = CameraInfo(
+            camera_type,
+            camera_id,
+            camera_name,
+            camera_serial_num,
+            camera_config
         )
+
         camera_infos.append(cam)
     return camera_infos
 
@@ -46,3 +95,34 @@ def resize_img(img, camera_type, img_w=128, img_h=128, offset_w=0, offset_h=0):
         :,
     ]
     return resized_img
+
+
+def notify_component_start(component_name):
+    print("***************************************************************")
+    print("     Starting {} component".format(component_name))
+    print("***************************************************************")
+
+
+class FrequencyTimer(object):
+    def __init__(self, frequency_rate):
+        self.time_available = 1e9 / frequency_rate
+
+    def start_loop(self):
+        self.start_time = time.time_ns()
+
+    def check_time(self, frequency_rate):
+        # if prev_check_time variable doesn't exist, create it
+        if not hasattr(self, "prev_check_time"):
+            self.prev_check_time = self.start_time
+
+        curr_time = time.time_ns()
+        if (curr_time - self.prev_check_time) > 1e9 / frequency_rate:
+            self.prev_check_time = curr_time
+            return True
+        return False
+
+    def end_loop(self):
+        wait_time = self.time_available + self.start_time
+
+        while time.time_ns() < wait_time:
+            continue
