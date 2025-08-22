@@ -1,16 +1,11 @@
-import pyrealsense2 as rs
-import time
 import cv2
 import zmq
 import time
 import struct
 from collections import deque
 import numpy as np
-
 from deoxys.sensor_interface.sensors.realsense import RealSenseCamera
 from deoxys.sensor_interface.sensors.opencv_cam import OpenCVCamera
-from deoxys.utils.cam_utils import load_camera_config, CameraInfo
-
 
 class ImageServer:
     def __init__(self, config, port = 5555, Unit_Test = False):
@@ -49,51 +44,46 @@ class ImageServer:
             #'wrist_camera_id_numbers': ["218622271789", "241222076627"],      # serial number (realsense)
         }
         """
-        
-        self.cam_configs = config
-        
-        for cam_info in config['camera_infos']:
-            # If cam_info is a dict, use ['camera_type'], if CameraInfo object, use .camera_type
-            cam_type = cam_info['camera_type'] if isinstance(cam_info, dict) else cam_info.camera_type
-            if cam_type == "realsense":
-                ctx = rs.context()
-                devices = ctx.query_devices()
-                for dev in devices:
-                    dev.hardware_reset()
-                print("Waiting for hardware reset on cameras for 15 seconds...")
-                time.sleep(1)
-                break
-        
         print(config)
-        # self.fps = config.get('fps', 30)
-        self.camera_infos = config.get('camera_infos', [])
-        self.port = config.get('camera_port', 5555)
+        self.fps = config.get('fps', 30)
+        self.head_camera_type = config.get('head_camera_type', 'opencv')
+        self.head_image_shape = config.get('head_camera_image_shape', [480, 640])      # (height, width)
+        self.head_camera_id_numbers = config.get('head_camera_id_numbers', [0])
+
+        self.wrist_camera_type = config.get('wrist_camera_type', None)
+        self.wrist_image_shape = config.get('wrist_camera_image_shape', [480, 640])    # (height, width)
+        self.wrist_camera_id_numbers = config.get('wrist_camera_id_numbers', None)
+
+        self.port = port
         self.Unit_Test = Unit_Test
 
-        # Initialize all cameras
-        self.cameras = []
-        for cam_info in self.camera_infos:
-            # If cam_info is a dict, use dict access, else attribute access
-            if isinstance(cam_info, dict):
-                cam_type = cam_info.get('camera_type', 'opencv')
-                img_shape = cam_info.get('image_shape', [cam_info.get('height', 480), cam_info.get('width', 640)])
-                cam_id = cam_info.get('camera_id', 0)
-                fps = cam_info.get('fps', 30)
-                serial_number = cam_info.get('camera_serial_num', None)
+
+        # Initialize head cameras
+        self.head_cameras = []
+        if self.head_camera_type == 'opencv':
+            for device_id in self.head_camera_id_numbers:
+                camera = OpenCVCamera(device_id=device_id, img_shape=self.head_image_shape, fps=self.fps)
+                self.head_cameras.append(camera)
+        elif self.head_camera_type == 'realsense':
+            for serial_number in self.head_camera_id_numbers:
+                camera = RealSenseCamera(img_shape=self.head_image_shape, fps=self.fps, serial_number=serial_number)
+                self.head_cameras.append(camera)
+        else:
+            print(f"[Image Server] Unsupported head_camera_type: {self.head_camera_type}")
+
+        # Initialize wrist cameras if provided
+        self.wrist_cameras = []
+        if self.wrist_camera_type and self.wrist_camera_id_numbers:
+            if self.wrist_camera_type == 'opencv':
+                for device_id in self.wrist_camera_id_numbers:
+                    camera = OpenCVCamera(device_id=device_id, img_shape=self.wrist_image_shape, fps=self.fps)
+                    self.wrist_cameras.append(camera)
+            elif self.wrist_camera_type == 'realsense':
+                for serial_number in self.wrist_camera_id_numbers:
+                    camera = RealSenseCamera(img_shape=self.wrist_image_shape, fps=self.fps, serial_number=serial_number)
+                    self.wrist_cameras.append(camera)
             else:
-                cam_type = getattr(cam_info, 'camera_type', 'opencv')
-                img_shape = getattr(cam_info, 'image_shape', [getattr(cam_info.cfg, 'height', 480), getattr(cam_info.cfg, 'width', 640)])
-                cam_id = getattr(cam_info, 'camera_id', 0)
-                fps = getattr(cam_info.cfg, 'fps', 30) if hasattr(cam_info, 'cfg') else 30
-                serial_number = getattr(cam_info, 'camera_serial_num', None)
-            if cam_type == 'opencv':
-                camera = OpenCVCamera(device_id=cam_id, img_shape=img_shape, fps=fps)
-            elif cam_type == 'realsense':
-                camera = RealSenseCamera(img_shape=img_shape, fps=fps, serial_number=serial_number)
-            else:
-                print(f"[Image Server] Unsupported camera_type: {cam_type}")
-                continue
-            self.cameras.append(camera)
+                print(f"[Image Server] Unsupported wrist_camera_type: {self.wrist_camera_type}")
 
         # Set ZeroMQ context and socket
         self.context = zmq.Context()
@@ -103,15 +93,25 @@ class ImageServer:
         if self.Unit_Test:
             self._init_performance_metrics()
 
-        for cam in self.cameras:
+        for cam in self.head_cameras:
             if isinstance(cam, OpenCVCamera):
-                print(f"[Image Server] Camera {cam.id} resolution: {cam.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)} x {cam.cap.get(cv2.CAP_PROP_FRAME_WIDTH)}")
+                print(f"[Image Server] Head camera {cam.id} resolution: {cam.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)} x {cam.cap.get(cv2.CAP_PROP_FRAME_WIDTH)}")
             elif isinstance(cam, RealSenseCamera):
-                print(f"[Image Server] Camera {cam.serial_number} resolution: {cam.img_shape[0]} x {cam.img_shape[1]}")
+                print(f"[Image Server] Head camera {cam.serial_number} resolution: {cam.img_shape[0]} x {cam.img_shape[1]}")
             else:
-                print("[Image Server] Unknown camera type.")
+                print("[Image Server] Unknown camera type in head_cameras.")
+
+        for cam in self.wrist_cameras:
+            if isinstance(cam, OpenCVCamera):
+                print(f"[Image Server] Wrist camera {cam.id} resolution: {cam.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)} x {cam.cap.get(cv2.CAP_PROP_FRAME_WIDTH)}")
+            elif isinstance(cam, RealSenseCamera):
+                print(f"[Image Server] Wrist camera {cam.serial_number} resolution: {cam.img_shape[0]} x {cam.img_shape[1]}")
+            else:
+                print("[Image Server] Unknown camera type in wrist_cameras.")
 
         print("[Image Server] Image server has started, waiting for client connections...")
+
+
 
     def _init_performance_metrics(self):
         self.frame_count = 0  # Total frames sent
@@ -135,7 +135,9 @@ class ImageServer:
             print(f"[Image Server] Real-time FPS: {real_time_fps:.2f}, Total frames sent: {self.frame_count}, Elapsed time: {elapsed_time:.2f} sec")
 
     def _close(self):
-        for cam in self.cameras:
+        for cam in self.head_cameras:
+            cam.release()
+        for cam in self.wrist_cameras:
             cam.release()
         self.socket.close()
         self.context.term()
@@ -144,30 +146,43 @@ class ImageServer:
     def send_process(self):
         try:
             while True:
-                # Grab frames from all cameras and concatenate horizontally
-                frames = []
-                for cam in self.cameras:
-                    if isinstance(cam, OpenCVCamera):
+                head_frames = []
+                for cam in self.head_cameras:
+                    if self.head_camera_type == 'opencv':
                         color_image = cam.get_frame()
                         if color_image is None:
-                            print("[Image Server] Camera frame read error (OpenCV).")
+                            print("[Image Server] Head camera frame read is error.")
                             break
-                        frames.append(color_image)
-                    elif isinstance(cam, RealSenseCamera):
-                        color_image, _ = cam.get_frame()
+                    elif self.head_camera_type == 'realsense':
+                        color_image, depth_iamge = cam.get_frame()
                         if color_image is None:
-                            print("[Image Server] Camera frame read error (RealSense).")
+                            print("[Image Server] Head camera frame read is error.")
                             break
-                        frames.append(color_image)
-                    else:
-                        print("[Image Server] Unknown camera type.")
-                        break
+                    head_frames.append(color_image)
+                if len(head_frames) != len(self.head_cameras):
+                    break
+                head_color = cv2.hconcat(head_frames)
+                                
+                if self.wrist_cameras:
+                    wrist_frames = []
+                    for cam in self.wrist_cameras:
+                        if self.wrist_camera_type == 'opencv':
+                            color_image = cam.get_frame()
+                            if color_image is None:
+                                print("[Image Server] Wrist camera frame read is error.")
+                                break
+                        elif self.wrist_camera_type == 'realsense':
+                            color_image, depth_iamge = cam.get_frame()
+                            if color_image is None:
+                                print("[Image Server] Wrist camera frame read is error.")
+                                break
+                        wrist_frames.append(color_image)
+                    wrist_color = cv2.hconcat(wrist_frames)
 
-                if len(frames) != len(self.cameras):
-                    continue  # Skip this iteration if any camera failed
-
-                # Concatenate all frames horizontally
-                full_color = cv2.hconcat(frames)
+                    # Concatenate head and wrist frames
+                    full_color = cv2.hconcat([head_color, wrist_color])
+                else:
+                    full_color = head_color
 
                 ret, buffer = cv2.imencode('.jpg', full_color)
                 if not ret:
@@ -198,8 +213,27 @@ class ImageServer:
 
 
 if __name__ == "__main__":
+    # config = {
+    #     'fps': 30,
+    #     'head_camera_type': 'opencv',
+    #     'head_camera_image_shape': [480, 1280],  # Head camera resolution
+    #     'head_camera_id_numbers': [0],
+    #     'wrist_camera_type': 'opencv',
+    #     'wrist_camera_image_shape': [480, 640],  # Wrist camera resolution
+    #     'wrist_camera_id_numbers': [2, 4],
+    # }
+
+    config = {
+        'fps': 30,
+        'head_camera_type': 'realsense',
+        'head_camera_image_shape': [480, 640],  # Head camera resolution
+        'head_camera_id_numbers': ["243322072209"],
+        'wrist_camera_type': 'realsense',
+        'wrist_camera_image_shape': [480, 640],  # Wrist camera resolution
+        'wrist_camera_id_numbers': ['153122078525', '218622273393'],
+    }
     
-    config = load_camera_config()    
+    
+
     server = ImageServer(config, Unit_Test=True)
     server.send_process()
-    

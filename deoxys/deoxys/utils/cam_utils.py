@@ -4,15 +4,12 @@ from deoxys import config_root
 import cv2
 import time
 
-CAM_FPS = 30
-DEPTH_PORT_OFFSET = 1000
-
 class CameraInfo:
     def __init__(self, camera_type, 
-                       camera_id, 
                        camera_name, 
-                       camera_serial_num, 
-                       camera_config):
+                       camera_config, 
+                       camera_id=None, 
+                       camera_serial_num=None):
         self.camera_type = camera_type
         self.camera_id = camera_id
         self.camera_name = camera_name
@@ -20,22 +17,19 @@ class CameraInfo:
         self.cfg = camera_config
 
     def __repr__(self):
-        return (f"RsCameraInfo(type={self.camera_type}, id={self.camera_id}, "
+        return (f"CameraInfo(type={self.camera_type}, id={self.camera_id}, "
                 f"name={self.camera_name}, serial={self.camera_serial_num}, "
-                f"host={self.cfg['host']}, port={self.cfg['port']}, depth_offset={self.cfg['depth_port_offset']}, "
-                f"width={self.cfg['width']}, height={self.cfg['height']}, fps={self.cfg['fps']})")
+                f"width={self.cfg.get('width', 'N/A')}, height={self.cfg.get('height', 'N/A')}, fps={self.cfg.get('fps', 'N/A')})")
 
 def load_camera_config(yaml_path=None):
     if yaml_path is None:
        yaml_path = os.path.join(config_root, "camera_setup_config.yml")
     with open(yaml_path, "r") as f:
         config = yaml.safe_load(f)
+    
     camera_infos = []
-
-
-    camera_host = config.get("cam_host", "unknown")
-    camera_port = int(config.get("cam_port", 8000))
-    depth_port_offset = int(config.get("depth_port_offset", 0))
+    camera_host = config.get("cam_host", "localhost")
+    camera_port = int(config.get("cam_port", 10001))
 
     for entry in config.get("cam_info", []):
         camera_type = entry.get("type", "unknown")
@@ -46,9 +40,6 @@ def load_camera_config(yaml_path=None):
         camera_config = {}
         if camera_type == "realsense":
             camera_config = {
-            "host": camera_host,
-            "port": camera_port,
-            "depth_port_offset": depth_port_offset,
             "width": config.get("cam_config", {}).get("realsense", {}).get("width", 640),
             "height": config.get("cam_config", {}).get("realsense", {}).get("height", 480),
             "fps": config.get("cam_config", {}).get("realsense", {}).get("fps", 30),
@@ -56,26 +47,25 @@ def load_camera_config(yaml_path=None):
             "depth": config.get("cam_config", {}).get("realsense", {}).get("depth", False)
             }
 
-        elif camera_type == "fisheye":
+        elif camera_type == "opencv":
             camera_config = {
-            "host": camera_host,
-            "port": camera_port,
-            "depth_port_offset": depth_port_offset,
-            "width": config.get("cam_config", {}).get("fisheye", {}).get("width", 640),
-            "height": config.get("cam_config", {}).get("fisheye", {}).get("height", 480),
-            "fps": config.get("cam_config", {}).get("fisheye", {}).get("fps", 30)
+            "width": config.get("cam_config", {}).get("opencv", {}).get("width", 640),
+            "height": config.get("cam_config", {}).get("opencv", {}).get("height", 480),
+            "fps": config.get("cam_config", {}).get("opencv", {}).get("fps", 30)
             }
 
         cam = CameraInfo(
             camera_type,
-            camera_id,
             camera_name,
-            camera_serial_num,
-            camera_config
+            camera_config,
+            camera_id,
+            camera_serial_num
         )
 
         camera_infos.append(cam)
-    return camera_infos
+
+    return {'camera_host': camera_host, 'camera_port': camera_port, 'camera_infos': camera_infos}
+
 
 def resize_img(img, camera_type, img_w=128, img_h=128, offset_w=0, offset_h=0):
 

@@ -191,7 +191,7 @@ if __name__ == "__main__":
 
     # example2
     # Initialize the client with performance evaluation enabled
-    client = ImageClient(image_show = True, server_address='127.0.0.1', port= 10001, Unit_Test=True) # local test
+    client = ImageClient(image_show = True, server_address='127.0.0.1', Unit_Test=True) # local test
     
     
     # client = ImageClient(image_show = True, server_address='192.168.123.164', Unit_Test=False) # deployment test
@@ -206,91 +206,3 @@ if __name__ == "__main__":
     while True:
         time.sleep(1)
         print("Image client is running... Press Ctrl+C to stop.")
-
-
-
-
-
-
-
-
-
-# import time
-# import cv2
-# import numpy as np
-# from deoxys.sensor_interface.network import ZMQCameraSubscriber
-# from deoxys.utils.cam_utils import notify_component_start
-
-# class CameraClient:
-#     def __init__(self, camera_info):
-#         self.camera_info = camera_info
-#         self.use_color = True
-#         self.use_depth = camera_info.cfg['depth']
-#         self.camera_id = camera_info.camera_id
-#         self.camera_name = camera_info.camera_name
-#         self.camera_type = camera_info.camera_type
-
-#         if self.use_color:
-#             self.color_sub = ZMQCameraSubscriber(
-#                     self.camera_info.cfg['host'], self.camera_info.cfg['port'] + self.camera_id, "RGB"
-#                 )
-#         if self.use_depth and self.camera_type == "realsense":
-#             self.depth_sub = ZMQCameraSubscriber(
-#                 self.camera_info.cfg['host'], self.camera_info.cfg['port'] + self.camera_info.cfg['depth_port_offset'] + self.camera_id, "Depth"
-#             )
-
-#     def start(self):
-#         notify_component_start(f"CameraClient for {self.camera_name}")
-
-#     def get_img(self):
-#         img_color = None
-#         img_depth = None
-#         if self.use_color:
-#             img_color, _ = self.color_sub.recv_rgb_image()
-#         if self.use_depth and self.camera_type == "realsense":
-#             img_depth, _ = self.depth_sub.recv_depth_image()
-#         return {"color": img_color, "depth": img_depth}
-
-#     def close(self):
-#         if self.use_color:
-#             self.color_sub.stop()
-#         if self.use_depth and self.camera_type == "realsense":
-#             self.depth_sub.stop()
-
-
-# if __name__ == "__main__":
-#     from deoxys.utils.cam_utils import load_camera_config
-#     camera_configs = load_camera_config()
-#     import collections
-#     # Create a CameraClient and frame_times for each camera
-#     cam_clients = [CameraClient(cfg) for cfg in camera_configs]
-#     for client in cam_clients:
-#         client.start()
-#     frame_times = [collections.deque(maxlen=30) for _ in cam_clients]
-#     last_times = [time.time() for _ in cam_clients]
-#     try:
-#         while True:
-#             for idx, (client, ftimes) in enumerate(zip(cam_clients, frame_times)):
-#                 imgs = client.get_img()
-#                 now = time.time()
-#                 ftimes.append(now - last_times[idx])
-#                 last_times[idx] = now
-#                 if len(ftimes) > 1:
-#                     fps = 1.0 / (sum(ftimes) / len(ftimes))
-#                 else:
-#                     fps = 0.0
-#                 win_prefix = f"{client.camera_name} (ID {client.camera_id})"
-#                 if imgs["color"] is not None:
-#                     color_img = imgs["color"].copy()
-#                     cv2.putText(color_img, f"FPS: {fps:.2f}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 2)
-#                     cv2.imshow(f"{win_prefix} - Color", color_img)
-#                     print(f"{win_prefix} FPS: {fps:.2f}", end='\r')
-#                 if imgs["depth"] is not None:
-#                     cv2.imshow(f"{win_prefix} - Depth", imgs["depth"])
-#             if cv2.waitKey(1) & 0xFF == ord('q'):
-#                 break
-#     finally:
-#         for client in cam_clients:
-#             client.close()
-#         cv2.destroyAllWindows()
-
