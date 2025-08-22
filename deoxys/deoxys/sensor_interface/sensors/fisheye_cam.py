@@ -1,6 +1,4 @@
 import numpy as np
-
-
 from deoxys.sensor_interface.network import ZMQCameraPublisher
 from deoxys.utils.cam_utils import FrequencyTimer, notify_component_start
 from deoxys.utils.cam_utils import CAM_FPS, DEPTH_PORT_OFFSET

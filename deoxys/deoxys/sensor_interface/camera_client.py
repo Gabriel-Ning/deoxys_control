@@ -6,19 +6,11 @@ import struct
 from collections import deque
 from multiprocessing import shared_memory
 import threading
+from deoxys.utils.cam_utils import load_camera_config, CameraInfo
 
-class ImageClient:
-    def __init__(self, tv_img_shape = None, tv_img_shm_name = None, wrist_img_shape = None, wrist_img_shm_name = None, 
-                       image_show = False, server_address = "127.0.0.1", port = 5555, Unit_Test = False):
-        """
-        tv_img_shape: User's expected head camera resolution shape (H, W, C). It should match the output of the image service terminal.
-
-        tv_img_shm_name: Shared memory is used to easily transfer images across processes to the Vuer.
-
-        wrist_img_shape: User's expected wrist camera resolution shape (H, W, C). It should maintain the same shape as tv_img_shape.
-
-        wrist_img_shm_name: Shared memory is used to easily transfer images.
-        
+class CameraClient:
+    def __init__(self, config , image_show = False, Unit_Test = False):
+        """        
         image_show: Whether to display received images in real time.
 
         server_address: The ip address to execute the image server script.
@@ -28,25 +20,75 @@ class ImageClient:
         Unit_Test: When both server and client are True, it can be used to test the image transfer latency, \
                    network jitter, frame loss rate and other information.
         """
+        """
+        config example1:
+        {
+            cam_host : 192.168.1.113
+            cam_port : 10001
+
+            cam_infos:
+                - cam_id: 0
+                  cam_serial_num: '310222078614'
+                  type: realsense
+                  name: camera_0
+
+                - cam_id: 1
+                  cam_serial_num: '152122075567'
+                  type: realsense
+                  name: camera_1
+
+                - cam_id: 2
+                  cam_serial_num: '243322072209'
+                  type: realsense
+                  name: camera_2
+
+                - cam_id: 3
+                  cam_serial_num: '317222073629'
+                  type: realsense
+                  name: camera_3
+
+            cam_config:
+                realsense:
+                  width: 640
+                  height: 480
+                  fps: 30
+                  processing_preset: 1
+                  depth: false
+
+                opencv:
+                  width: 640
+                  height: 480
+                  fps: 30
+        }
+        """
+
+        print(config)
+
         self.running = True
         self._image_show = image_show
-        self._server_address = server_address
-        self._port = port
+        self.cam_configs = config
+        self.camera_infos = config.get('camera_infos', [])
+        self._port = config.get('camera_port', 10001)
+        self._server_address = config.get('camera_host', 'localhost')
+        self.Unit_Test = Unit_Test
 
-        self.tv_img_shape = tv_img_shape
-        self.wrist_img_shape = wrist_img_shape
-
-        self.tv_enable_shm = False
-        if self.tv_img_shape is not None and tv_img_shm_name is not None:
-            self.tv_image_shm = shared_memory.SharedMemory(name=tv_img_shm_name)
-            self.tv_img_array = np.ndarray(tv_img_shape, dtype = np.uint8, buffer = self.tv_image_shm.buf)
-            self.tv_enable_shm = True
-        
-        self.wrist_enable_shm = False
-        if self.wrist_img_shape is not None and wrist_img_shm_name is not None:
-            self.wrist_image_shm = shared_memory.SharedMemory(name=wrist_img_shm_name)
-            self.wrist_img_array = np.ndarray(wrist_img_shape, dtype = np.uint8, buffer = self.wrist_image_shm.buf)
-            self.wrist_enable_shm = True
+        ## Drop out the Shared Memory should work
+        self.img_contents = {}
+        for cam_info in self.camera_infos:
+            img_shape = getattr(cam_info, 'image_shape', [getattr(cam_info.cfg, 'height', 480), getattr(cam_info.cfg, 'width', 640), 3])
+            cam_name = getattr(cam_info, 'camera_name', 'camera_0')
+            cam_id = getattr(cam_info, 'camera_id', 0)
+            image_shm = shared_memory.SharedMemory(create=True, size=np.prod(img_shape) * np.uint8().itemsize)
+            img_array = np.ndarray(img_shape, dtype=np.uint8, buffer=image_shm.buf)
+            serial_number = getattr(cam_info, 'camera_serial_num', None)
+            self.img_contents[cam_name] = {
+                'image_shape': img_shape,
+                'cam_name': cam_name,
+                'cam_id': cam_id,
+                'cam_serial_num': serial_number,
+                'img_array': img_array,
+                'image_shm': image_shm
+            }
 
         # Performance evaluation parameters
         self._enable_performance_eval = Unit_Test
@@ -122,7 +164,6 @@ class ImageClient:
             cv2.destroyAllWindows()
         print("Image client has been closed.")
 
-    
     def receive_process(self):
         # Set up ZeroMQ context and socket
         self._context = zmq.Context()
@@ -157,16 +198,19 @@ class ImageClient:
                     print("[Image Client] Failed to decode image.")
                     continue
 
-                if self.tv_enable_shm:
-                    np.copyto(self.tv_img_array, np.array(current_image[:, :self.tv_img_shape[1]]))
-                
-                if self.wrist_enable_shm:
-                    np.copyto(self.wrist_img_array, np.array(current_image[:, -self.wrist_img_shape[1]:]))
-                
+                for image_content in self.img_contents.values():
+                    cam_width = image_content['image_shape'][1]
+                    cam_id = image_content['cam_id']
+                    np.copyto(image_content['img_array'], np.array(current_image[:, cam_id * cam_width : (cam_id + 1) * cam_width]))
+
                 if self._image_show:
-                    height, width = current_image.shape[:2]
-                    resized_image = cv2.resize(current_image, (width // 2, height // 2))
-                    cv2.imshow('Image Client Stream', resized_image)
+                    # Display each camera image in a separate window
+                    for cam_name, image_content in self.img_contents.items():
+                        img = image_content['img_array']
+                        serial_num = image_content.get('cam_serial_num', 'unknown')
+                        window_name = f"Camera: {cam_name} (SN: {serial_num})"
+                        cv2.imshow(window_name, img)
+
                     if cv2.waitKey(1) & 0xFF == ord('q'):
                         self.running = False
 
@@ -182,22 +226,12 @@ class ImageClient:
             self._close()
 
 if __name__ == "__main__":
-    # example1
-    # tv_img_shape = (480, 1280, 3)
-    # img_shm = shared_memory.SharedMemory(create=True, size=np.prod(tv_img_shape) * np.uint8().itemsize)
-    # img_array = np.ndarray(tv_img_shape, dtype=np.uint8, buffer=img_shm.buf)
-    # img_client = ImageClient(tv_img_shape = tv_img_shape, tv_img_shm_name = img_shm.name)
-    # img_client.receive_process()
-
-    # example2
+    # example
     # Initialize the client with performance evaluation enabled
-    client = ImageClient(image_show = True, server_address='127.0.0.1', port= 10001, Unit_Test=True) # local test
+    config = load_camera_config()   
+    client = CameraClient(config, image_show = True, Unit_Test=True) # local test
     
-    
-    # client = ImageClient(image_show = True, server_address='192.168.123.164', Unit_Test=False) # deployment test
-    # client.receive_process()
-    
-    
+
     image_receive_thread = threading.Thread(target = client.receive_process, daemon = True)
     image_receive_thread.daemon = True
     image_receive_thread.start()
@@ -206,91 +240,4 @@ if __name__ == "__main__":
     while True:
         time.sleep(1)
         print("Image client is running... Press Ctrl+C to stop.")
-
-
-
-
-
-
-
-
-
-# import time
-# import cv2
-# import numpy as np
-# from deoxys.sensor_interface.network import ZMQCameraSubscriber
-# from deoxys.utils.cam_utils import notify_component_start
-
-# class CameraClient:
-#     def __init__(self, camera_info):
-#         self.camera_info = camera_info
-#         self.use_color = True
-#         self.use_depth = camera_info.cfg['depth']
-#         self.camera_id = camera_info.camera_id
-#         self.camera_name = camera_info.camera_name
-#         self.camera_type = camera_info.camera_type
-
-#         if self.use_color:
-#             self.color_sub = ZMQCameraSubscriber(
-#                     self.camera_info.cfg['host'], self.camera_info.cfg['port'] + self.camera_id, "RGB"
-#                 )
-#         if self.use_depth and self.camera_type == "realsense":
-#             self.depth_sub = ZMQCameraSubscriber(
-#                 self.camera_info.cfg['host'], self.camera_info.cfg['port'] + self.camera_info.cfg['depth_port_offset'] + self.camera_id, "Depth"
-#             )
-
-#     def start(self):
-#         notify_component_start(f"CameraClient for {self.camera_name}")
-
-#     def get_img(self):
-#         img_color = None
-#         img_depth = None
-#         if self.use_color:
-#             img_color, _ = self.color_sub.recv_rgb_image()
-#         if self.use_depth and self.camera_type == "realsense":
-#             img_depth, _ = self.depth_sub.recv_depth_image()
-#         return {"color": img_color, "depth": img_depth}
-
-#     def close(self):
-#         if self.use_color:
-#             self.color_sub.stop()
-#         if self.use_depth and self.camera_type == "realsense":
-#             self.depth_sub.stop()
-
-
-# if __name__ == "__main__":
-#     from deoxys.utils.cam_utils import load_camera_config
-#     camera_configs = load_camera_config()
-#     import collections
-#     # Create a CameraClient and frame_times for each camera
-#     cam_clients = [CameraClient(cfg) for cfg in camera_configs]
-#     for client in cam_clients:
-#         client.start()
-#     frame_times = [collections.deque(maxlen=30) for _ in cam_clients]
-#     last_times = [time.time() for _ in cam_clients]
-#     try:
-#         while True:
-#             for idx, (client, ftimes) in enumerate(zip(cam_clients, frame_times)):
-#                 imgs = client.get_img()
-#                 now = time.time()
-#                 ftimes.append(now - last_times[idx])
-#                 last_times[idx] = now
-#                 if len(ftimes) > 1:
-#                     fps = 1.0 / (sum(ftimes) / len(ftimes))
-#                 else:
-#                     fps = 0.0
-#                 win_prefix = f"{client.camera_name} (ID {client.camera_id})"
-#                 if imgs["color"] is not None:
-#                     color_img = imgs["color"].copy()
-#                     cv2.putText(color_img, f"FPS: {fps:.2f}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 2)
-#                     cv2.imshow(f"{win_prefix} - Color", color_img)
-#                     print(f"{win_prefix} FPS: {fps:.2f}", end='\r')
-#                 if imgs["depth"] is not None:
-#                     cv2.imshow(f"{win_prefix} - Depth", imgs["depth"])
-#             if cv2.waitKey(1) & 0xFF == ord('q'):
-#                 break
-#     finally:
-#         for client in cam_clients:
-#             client.close()
-#         cv2.destroyAllWindows()
 

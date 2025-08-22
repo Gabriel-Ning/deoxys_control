@@ -1,19 +1,19 @@
 cam_host : 192.168.1.113
 cam_port : 10001
 
-cam_info:
+cam_infos:
  - cam_id: 0
-   cam_serial_num: '243322072209'
+   cam_serial_num: '310222078614'
    type: realsense
    name: camera_0
 
  - cam_id: 1
-   cam_serial_num: '153122078525'
+   cam_serial_num: '152122075567'
    type: realsense
    name: camera_1
 
  - cam_id: 2
-   cam_serial_num: '218622273393'
+   cam_serial_num: '243322072209'
    type: realsense
    name: camera_2
 
