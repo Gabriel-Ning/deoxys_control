@@ -158,6 +158,17 @@ class CameraClient:
                   Min Latency: {min_latency*1000:.2f} ms, Jitter: {jitter*1000:.2f} ms, Lost Frame Rate: {lost_frame_rate:.2f}%")
     
     def _close(self):
+        # Release all shared memory objects
+        for cam_name, img_info in getattr(self, 'img_contents', {}).items():
+            shm = img_info.get('image_shm', None)
+            if shm is not None:
+                try:
+                    shm.close()
+                    shm.unlink()
+                    print(f"Released shared memory for {cam_name}")
+                except Exception as e:
+                    print(f"Error releasing shared memory for {cam_name}: {e}")
+                    
         self._socket.close()
         self._context.term()
         if self._image_show:
@@ -229,7 +240,7 @@ if __name__ == "__main__":
     # example
     # Initialize the client with performance evaluation enabled
     config = load_camera_config()   
-    client = CameraClient(config, image_show = True, Unit_Test=True) # local test
+    client = CameraClient(config, image_show = True, Unit_Test=False) # local test
     
 
     image_receive_thread = threading.Thread(target = client.receive_process, daemon = True)

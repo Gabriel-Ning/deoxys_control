@@ -31,7 +31,7 @@ def load_camera_config(yaml_path=None):
     camera_host = config.get("cam_host", "localhost")
     camera_port = int(config.get("cam_port", 10001))
 
-    for entry in config.get("cam_info", []):
+    for entry in config.get("cam_infos", []):
         camera_type = entry.get("type", "unknown")
         camera_id = entry.get("cam_id", 0)
         camera_name = entry.get("name", "unknown")

@@ -12,8 +12,8 @@ logger = get_deoxys_example_logger()
 def main():
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--interface-cfg", type=str, default="franka_right.yml")
-    parser.add_argument("--controller-type", type=str, default="OSC_POSE")
+    parser.add_argument("--interface-cfg", type=str, default="franka_gn.yml")
+    parser.add_argument("--controller-type", type=str, default="OSC_POSITION")
 
     args = parser.parse_args()
     device = ZikwayGamepad(pos_sensitivity= 1.0, rot_sensitivity=1.0)
